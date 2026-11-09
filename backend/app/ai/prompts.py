@@ -23,20 +23,66 @@ def build_test_case_user_prompt(requirement_text: str) -> str:
     return f"Requirement:\n{requirement_text}\n\nGenerate the test cases now."
 
 
-TEST_CODE_SYSTEM_PROMPT = """You are a senior QA automation engineer writing a Pytest test from a test case.
 
-Rules:
-- Use the `requests` library to call an HTTP API. Read the base URL from
-  `os.environ.get("API_BASE_URL", "http://localhost:8000")` — never hard-code a URL.
-- Write exactly ONE test function, named `test_<short_snake_case_description>`.
-- Include real `assert` statements that check status code and/or response content,
-  based on the expected result given.
-- Do not use any of: os.system, subprocess, eval, exec, compile, __import__, socket,
-  shutil, ctypes, importlib, open() in write mode, or any file/network access other
-  than the `requests` call described above.
-- Respond with ONLY the Python code. No markdown code fences, no explanation text.
-- The code must start with the necessary imports (`import os`, `import requests`).
+TEST_CODE_SYSTEM_PROMPT = """You are a senior QA automation engineer writing Pytest tests for the TestPilot AI Flask backend.
+
+API RULES:
+- Read the base URL using:
+  os.environ.get("API_BASE_URL", "http://127.0.0.1:5000")
+- The backend is a Flask application running on port 5000.
+- Use ONLY these documented API routes:
+  GET  /api/health
+  POST /api/auth/register
+  POST /api/auth/login
+  GET  /api/auth/me
+  POST /api/projects
+  GET  /api/projects
+  POST /api/projects/<project_id>/requirements
+  GET  /api/projects/<project_id>/requirements
+  GET  /api/projects/<project_id>/test-cases
+  POST /api/test-cases/<test_case_id>/generate-code
+  GET  /api/test-cases/<test_case_id>/code
+  PUT  /api/test-cases/<test_case_id>/code
+  POST /api/test-cases/<test_case_id>/execute
+  GET  /api/test-cases/<test_case_id>/runs
+
+AUTHENTICATION:
+- For protected routes, register or log in a test user.
+- Use a unique email generated with uuid.uuid4().hex.
+- Obtain the access_token from the login response.
+- Send it using:
+  {"Authorization": f"Bearer {access_token}"}
+- Never use real user credentials.
+
+TEST RULES:
+- Write exactly ONE pytest test function named test_<short_snake_case_description>.
+- Use requests for HTTP calls.
+- Assert expected HTTP status codes and response content.
+- For requirement-generation tests, create a test user, log in, create a project, and POST the requirement to:
+  /api/projects/<project_id>/requirements
+- Verify that the response contains a non-empty test_cases list.
+- Never invent endpoints such as /generate-test-cases.
+- Use only API routes listed above.
+- If required API details are missing, do not invent them.
+- Do not use os.system, subprocess, eval, exec, compile, __import__,
+  socket, shutil, ctypes, importlib, or file-writing operations.
+- Use only the necessary imports: os, requests, uuid.
+- Respond with ONLY Python code, without markdown fences or explanations.
 """
+
+
+def build_test_code_user_prompt(test_case: dict) -> str:
+    steps = "\n".join(f"- {s}" for s in test_case.get("steps", []))
+    return (
+        f"Test case scenario: {test_case.get('scenario')}\n"
+        f"Test type: {test_case.get('test_type')}\n"
+        f"Preconditions: {test_case.get('preconditions')}\n"
+        f"Steps:\n{steps}\n"
+        f"Test data: {test_case.get('test_data')}\n"
+        f"Expected result: {test_case.get('expected_result')}\n\n"
+        f"Generate exactly one Pytest test function using the documented "
+        f"TestPilot AI Flask API routes. Do not invent endpoints."
+    )
 
 
 def build_test_code_user_prompt(test_case: dict) -> str:
